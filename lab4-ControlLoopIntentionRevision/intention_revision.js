@@ -26,8 +26,8 @@ socket.onSensing( ( { self } ) => {
     const {id, name, x, y, score} = self;
     me.id = id;
     me.name = name;
-    me.x = x ? x : -1;
-    me.y = y ? y : -1;
+    if ( x != undefined ) me.x = x;
+    if ( y != undefined ) me.y = y;
     me.score = score;
 } )
 
@@ -37,12 +37,15 @@ socket.onSensing( ( { self } ) => {
 const parcels = new Map();
 
 socket.onSensing( async ( sensing ) => {
+    // add or update perceived parcels
     for (const p of sensing.parcels) {
         parcels.set( p.id, p);
     }
-    for ( const p of parcels.values() ) {
-        if ( sensing.parcels.map( p => p.id ).find( id => id == p.id ) == undefined ) {
-            parcels.delete( p.id );
+    // forget parcels that are no longer perceived
+    const perceived_ids = new Set( sensing.parcels.map( p => p.id ) );
+    for ( const id of parcels.keys() ) {
+        if ( ! perceived_ids.has( id ) ) {
+            parcels.delete( id );
         }
     }
 } )
@@ -135,15 +138,15 @@ class IntentionRevision {
                 let p = parcels.get(id)
                 if ( p && p.carriedBy ) {
                     console.log( 'Skipping intention because no more valid', intention.predicate )
-                    continue;
                 }
-
-                // Start achieving intention
-                await intention.achieve()
-                // Catch eventual error and continue
-                .catch( error => {
-                    // console.log( 'Failed intention', ...intention.predicate, 'with error:', ...error )
-                } );
+                else {
+                    // Start achieving intention
+                    await intention.achieve()
+                    // Catch eventual error and continue
+                    .catch( error => {
+                        // console.log( 'Failed intention', ...intention.predicate, 'with error:', ...error )
+                    } );
+                }
 
                 // Remove from the queue
                 this.intention_queue.shift();
@@ -183,7 +186,7 @@ class IntentionRevisionQueue extends IntentionRevision {
         if ( this.intention_queue.find( (i) => i.predicate.join(' ') == predicate.join(' ') ) )
             return; // intention is already queued
 
-        console.log( 'IntentionRevisionReplace.push', predicate );
+        console.log( 'IntentionRevisionQueue.push', predicate );
         const intention = new IntentionDeliberation( this, predicate );
         this.intention_queue.push( intention );
     }
@@ -277,7 +280,7 @@ class IntentionDeliberation {
     }
 
     /**
-     * @param { IntentionDeliberation } parent 
+     * @param { IntentionRevision | PlanBase } parent 
      * @param { [string, ...any] } predicate 
      */
     constructor ( parent, predicate ) {
@@ -319,7 +322,7 @@ class IntentionDeliberation {
                 // and plan is executed and result returned
                 try {
                     const plan_res = await this.#current_plan?.execute( ...this.predicate );
-                    this.log( 'succesful intention', ...this.predicate, 'with plan', planClass.name, 'with result:', plan_res );
+                    this.log( 'successful intention', ...this.predicate, 'with plan', planClass.name, 'with result:', plan_res );
                     return plan_res || false;
                 // or errors are caught so to continue with next plan
                 } catch (error) {
@@ -387,7 +390,7 @@ class PlanBase {
     #parent;
 
     /**
-     * @param { PlanBase } parent
+     * @param { IntentionDeliberation } parent
      */
     constructor ( parent ) {
         this.#parent = parent;
@@ -470,10 +473,10 @@ class BlindMove extends PlanBase {
             
             // this.log('me', me, 'xy', x, y);
 
-            if ( me.x && x > me.x )
+            if ( x > me.x )
                 moved_horizontally = await socket.emitMove('right')
                 // status_x = await this.subIntention( 'go_to', {x: me.x+1, y: me.y} );
-            else if ( me.x && x < me.x )
+            else if ( x < me.x )
                 moved_horizontally = await socket.emitMove('left')
                 // status_x = await this.subIntention( 'go_to', {x: me.x-1, y: me.y} );
 
@@ -484,10 +487,10 @@ class BlindMove extends PlanBase {
 
             if ( this.stopped ) throw ['stopped']; // if stopped then quit
 
-            if ( me.y && y > me.y )
+            if ( y > me.y )
                 moved_vertically = await socket.emitMove('up')
                 // status_x = await this.subIntention( 'go_to', {x: me.x, y: me.y+1} );
-            else if ( me.y && y < me.y )
+            else if ( y < me.y )
                 moved_vertically = await socket.emitMove('down')
                 // status_x = await this.subIntention( 'go_to', {x: me.x, y: me.y-1} );
 
@@ -497,8 +500,8 @@ class BlindMove extends PlanBase {
             }
             
             if ( ! moved_horizontally && ! moved_vertically) {
-                this.log('stucked');
-                throw 'stucked';
+                this.log('stuck');
+                throw 'stuck';
             } else if ( me.x == x && me.y == y ) {
                 // this.log('target reached');
             }

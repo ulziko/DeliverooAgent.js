@@ -39,9 +39,9 @@ footer: 'Marco Robol - University of Trento, A.Y. 2026/2027 - Autonomous Softwar
 
 <!-- _class: lead -->
 
-# Implementing the BDI control loop
+# Implementing a Reactive Agent
 
-Implementing the BDI control loop for the Deliveroo.js environment
+Implementing a Reactive Agent for the Deliveroo.js environment
 
 Code: [https://github.com/unitn-ASA/DeliverooAgent.js](https://github.com/unitn-ASA/DeliverooAgent.js)
 Deliveroo.js: [https://github.com/unitn-ASA/Deliveroo.js](https://github.com/unitn-ASA/Deliveroo.js)
